@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="bn">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MT Trade Demo</title>
+  <style>
+    :root{
+      --bg:#0f1724; --card:#0b1220; --muted:#94a3b8; --accent:#06b6d4;
+      --success:#10b981; --danger:#ef4444; --glass: rgba(255,255,255,0.03);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family:system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      background:linear-gradient(180deg,#071028 0%, #071428 100%); color:#e6eef6;
+      -webkit-font-smoothing:antialiased;
+    }
+    .container{max-width:1100px;margin:36px auto;padding:20px;}
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+    h1{font-size:20px;margin:0}
+    .controls{display:flex;gap:8px;align-items:center}
+    input[type="text"]{
+      background:var(--glass); border:1px solid rgba(255,255,255,0.04); padding:8px 10px; color:inherit; border-radius:8px;
+    }
+    button{
+      background:linear-gradient(180deg,var(--accent),#0891b2); border:0;color:#021018;padding:8px 12px;border-radius:8px;
+      cursor:pointer;font-weight:600;
+    }
+    .panel{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border:1px solid rgba(255,255,255,0.03); padding:12px;border-radius:12px}
+    table{width:100%;border-collapse:collapse;font-size:13px;color:#e6eef6}
+    thead th{ text-align:left;padding:10px 12px;font-size:12px;color:var(--muted);font-weight:600;border-bottom:1px dashed rgba(255,255,255,0.03)}
+    tbody td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.02)}
+    .tag{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px}
+    .buy{background:rgba(16,185,129,0.12);color:var(--success);border:1px solid rgba(16,185,129,0.12)}
+    .sell{background:rgba(239,68,68,0.08);color:var(--danger);border:1px solid rgba(239,68,68,0.06)}
+    .meta{font-size:12px;color:var(--muted)}
+    .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+    .small{font-size:12px;padding:6px 10px}
+    footer{margin-top:18px;color:var(--muted);font-size:13px;text-align:center}
+    @media (max-width:720px){
+      .container{padding:12px;margin:18px}
+      header{flex-direction:column;align-items:flex-start;gap:10px}
+      thead th:nth-child(6), tbody td:nth-child(6){display:none}
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>MT Trade Demo</h1>
+        <div class="meta">সিমুলেটেড ট্রেড লিস্ট — ডেমো ইন্টারফেস</div>
+      </div>
+      <div class="controls">
+        <input id="q" type="text" placeholder="Search pair or type (BTC/USDT, buy...)" />
+        <button id="generate">নতুন ট্রেড</button>
+        <button id="export">Export CSV</button>
+      </div>
+    </header>
+
+    <section class="panel">
+      <div class="toolbar">
+        <div class="meta">Showing <span id="count">0</span> trades</div>
+        <div style="flex:1"></div>
+        <label class="meta">Auto add:
+          <input id="autotoggle" type="checkbox" style="margin-left:8px" />
+        </label>
+      </div>
+
+      <div style="overflow:auto;max-height:520px">
+        <table id="tradesTable" aria-live="polite">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Pair</th>
+              <th>Type</th>
+              <th>Price</th>
+              <th>Qty</th>
+              <th>Value</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <footer>
+        ডেমো পেজ — কীভাবে কাজ করে: "নতুন ট্রেড" ক্লিক করে অথবা Auto add অন করলে প্রতি কয়েক সেকেন্ডে স্যাম্পল ট্রেড যুক্ত হবে।
+      </footer>
+    </section>
+  </div>
+
+  <script>
+    const pairs = ["BTC/USDT","ETH/USDT","XRP/USDT","SOL/USDT","LTC/USDT"];
+    const tbody = document.querySelector("#tradesTable tbody");
+    const qEl = document.getElementById("q");
+    const countEl = document.getElementById("count");
+    const autoToggle = document.getElementById("autotoggle");
+    let trades = [];
+
+    function fmt(n){ return Number(n).toLocaleString(undefined, {maximumFractionDigits:8}) }
+    function random(min,max){ return Math.random()*(max-min)+min }
+    function nowIso(){ return new Date().toLocaleTimeString() }
+
+    function makeTrade(){
+      const pair = pairs[Math.floor(Math.random()*pairs.length)];
+      const type = Math.random() < 0.5 ? "BUY":"SELL";
+      const price = (type === "BUY" ? random(1000,70000) : random(900,70000));
+      const qty = random(0.01,5);
+      const value = price*qty;
+      const status = Math.random() < 0.9 ? "filled":"partial";
+      return {
+        time: nowIso(),
+        pair, type, price: price.toFixed(2),
+        qty: qty.toFixed(4), value: value.toFixed(2),
+        status
+      };
+    }
+
+    function renderRows(list){
+      tbody.innerHTML = "";
+      const frag = document.createDocumentFragment();
+      list.forEach(t => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${t.time}</td>
+          <td>${t.pair}</td>
+          <td><span class="tag ${t.type.toLowerCase()==='buy'?'buy':'sell'}">${t.type}</span></td>
+          <td>${fmt(t.price)}</td>
+          <td>${t.qty}</td>
+          <td>${fmt(t.value)}</td>
+          <td class="meta">${t.status}</td>
+        `;
+        frag.appendChild(tr);
+      });
+      tbody.appendChild(frag);
+      countEl.textContent = list.length;
+    }
+
+    function addTrade(t){
+      trades.unshift(t);
+      if(trades.length > 1000) trades.pop();
+      applyFilter();
+    }
+
+    function applyFilter(){
+      const q = (qEl.value || "").trim().toLowerCase();
+      if(!q){ renderRows(trades); return; }
+      const filtered = trades.filter(t =>
+        t.pair.toLowerCase().includes(q) ||
+        t.type.toLowerCase().includes(q) ||
+        t.status.toLowerCase().includes(q)
+      );
+      renderRows(filtered);
+    }
+
+    document.getElementById("generate").addEventListener("click", () => {
+      addTrade(makeTrade());
+    });
+
+    qEl.addEventListener("input", () => applyFilter());
+
+    let autoInterval = null;
+    autoToggle.addEventListener("change", (e) => {
+      if(e.target.checked){
+        autoInterval = setInterval(() => addTrade(makeTrade()), 2500);
+      } else {
+        clearInterval(autoInterval);
+      }
+    });
+
+    for(let i=0;i<12;i++) trades.push(makeTrade());
+    applyFilter();
+
+    document.getElementById("export").addEventListener("click", () => {
+      const rows = [["time","pair","type","price","qty","value","status"], ...trades.map(t => [t.time,t.pair,t.type,t.price,t.qty,t.value,t.status])];
+      const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n");
+      const blob = new Blob([csv], {type:"text/csv;charset=utf-8"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = "mt-trade-demo.csv";
+      document.body.appendChild(a); a.click();
+      a.remove(); URL.revokeObjectURL(url);
+    });
+
+    window.addEventListener("keydown", (e) => {
+      if(e.key.toLowerCase() === "n") addTrade(makeTrade());
+    });
+  </script>
+</body>
+</html>
